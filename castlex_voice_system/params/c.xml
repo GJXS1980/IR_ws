@@ -1,0 +1,14 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?><nlp>
+  <version>1.1</version>
+  <rawtext>向右转</rawtext>
+  <confidence>81</confidence>
+  <engine>local</engine>
+  <result>
+    <focus>commands</focus>
+    <confidence>84</confidence>
+    <object>
+      <commands id="3">向右转</commands>
+    </object>
+  </result>
+</nlp>
+

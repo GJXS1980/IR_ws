@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<launch>
+
+<node pkg="tf" type="static_transform_publisher" name="camera_broadcaster" args="-0.038596 0.114021 0.019666 1.55447 -0.0166198 -0.00825487 usb_cam /visualization_marker 100" />  
+
+</launch>
+

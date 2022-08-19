@@ -1,0 +1,21 @@
+﻿﻿#BNF+IAT 1.0 UTF-8;
+!grammar call;
+!slot <action>;
+!slot <position>;
+!slot <pick>;
+!slot <block>;
+
+!start <callstart>;
+<callstart>:[<action>]<dial>;
+<action>:去|到|去到|往|前往|前进到|跑到|跑|启动|开始;
+
+<dial>:<position>[<pick>][<block>];
+<position>:中转台!id(4)|中转!id(4)|物料!id(4)|物料台!id(4)|
+立体仓库!id(6)|立体!id(6)|仓库!id(6)|
+装配台!id(5)|装配!id(5);
+
+<pick>:抓取|抓|放置|放|搬|拿;
+
+<block>:物料!id(0)|物料盘!id(0)|物料盒!id(0)|螺丝!id(0)|螺母!id(0)|螺丝盘!id(0)|螺母盘!id(0)|材料!id(0);
+
+

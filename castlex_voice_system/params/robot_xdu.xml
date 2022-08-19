@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8' standalone='yes' ?><nlp>
+  <version>1.1</version>
+  <rawtext>关闭一级消毒</rawtext>
+  <confidence>74</confidence>
+  <engine>local</engine>
+  <result>
+    <focus>action|grade|disinfect</focus>
+    <confidence>89|75|54</confidence>
+    <object>
+      <action id="0">关闭</action>
+      <grade id="1">一级</grade>
+      <disinfect id="1">消毒</disinfect>
+    </object>
+  </result>
+</nlp>
+
