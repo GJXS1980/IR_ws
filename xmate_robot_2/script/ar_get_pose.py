@@ -35,7 +35,7 @@ class Findposition:
 
         # 将图像从RGB转成灰度图
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)  
-        pixel = int(np.mean(gray [gray  > 90]))
+        pixel = int(float(np.mean(gray [gray  > 90])))
         gray [gray  > 50] = pixel
         IMG_OUT = cv2.cvtColor(gray, cv2.COLOR_GRAY2RGB)
         self.image_pub.publish(self.bridge.cv2_to_imgmsg(IMG_OUT, "bgr8"))
