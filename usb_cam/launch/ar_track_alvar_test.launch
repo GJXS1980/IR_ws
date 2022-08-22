@@ -1,3 +1,5 @@
+<?xml version='1.0' encoding='utf-8'?>
+
 <launch>
 	<node pkg="tf" type="static_transform_publisher" name="world_to_cam" args="-0.038596 -0.114021 0.019666 0.0 -0.0166198 -0.00825487 usb_cam tool0 100"/>
 	<arg name="marker_size" default="4.12" />
