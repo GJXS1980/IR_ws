@@ -48,6 +48,26 @@ int main(int argc, char *argv[])
     bool move_forward = false;
     bool move_backward = false;
 
+    //初始化参数
+ 	float sx ,sy ,sz ,ww ,wx ,wy, wz;
+    //  机械臂平移运动
+	float sx1 ,sy1 ,sz1 ,ww1 ,wx1 ,wy1, wz1;
+    //  机械臂平移运动校准
+    float sx2 ,sy2 ,sz2 ,ww2 ,wx2 ,wy2, wz2;
+     //  机械臂平移运动放置
+    float sx3 ,sy3 ,sz3 ,ww3 ,wx3 ,wy3, wz3;
+    //放置顺序对应的AR码ID
+    int BJJ_ID = 4;
+    //钣金件放置抓取参数
+    double bjj_place_x, bjj_place_y, bjj_place_z;
+    double bjj_grasp_x, bjj_grasp_y, bjj_grasp_z;
+    double robot_angle = 0.0;   // 校准角度
+    //放置完成信号
+    std_msgs::Int32 tag;
+    //定义PI和固定位姿
+    const double PI = 3.14159;
+    std::array<double, 7> q_init;
+
     //  机械臂移动速度
     node.param("move_sped", move_sped, 0.2);
     //  启动力矩监听
@@ -56,14 +76,24 @@ int main(int argc, char *argv[])
     node.param("move_deviation_LR", move_dev_LR, 0.05);
     //  偏移距离 前后
     node.param("move_deviation_FB", move_dev_FB, 0.05);
+    // 从物料盘上面抓取钣金件参数
+    node.param("bjj_grasp_x", bjj_grasp_x, 0.015);  //  从物料盘抓取id1物料时机械臂的x坐标偏移量(笛卡尔坐标系)，增大往左
+    node.param("bjj_grasp_y", bjj_grasp_y, 0.004);  //　从物料盘抓取id1物料时机械臂的y坐标偏移量(笛卡尔坐标系)，增大向前
+    node.param("bjj_grasp_z", bjj_grasp_z, 0.040134663);  //　从物料盘抓取id1物料时机械臂的z坐标偏移量(笛卡尔坐标系)，往下减小
+
+    // 设置放置钣金件参数
+    node.param("bjj_place_x", bjj_place_x, 0.007);  // 放置物料到装配台时机械臂的x坐标偏移量(笛卡尔坐标系)，增大往左(默认：0.007)
+    node.param("bjj_place_y", bjj_place_y, 0.053);  //　放置物料到装配台时机械臂的y坐标偏移量(笛卡尔坐标系)，增大向前(默认：0.053)
+    node.param("bjj_place_z", bjj_place_z, 0.253);    //　放置物料到装配台时机械臂的z坐标偏移量(笛卡尔坐标系)，往下增大(默认：0.253)
+
     //  未接收到数据次数
 
     //  左右偏移距离设置
-    if(move_dev_LR>0.1)
+    if(move_dev_LR > 0.1)
     {
         move_dev_LR = 0.1;
     }
-    if(move_dev_LR<0.01)
+    if(move_dev_LR < 0.01)
     {
         move_dev_LR = 0.01;
     }
@@ -99,37 +129,16 @@ int main(int argc, char *argv[])
     
     ros::Subscriber marker_sub3 = n.subscribe("/aruco_single1/pose", 1, &HG_AI_Robot::Get_UR_Pose, &Robot_Interface);
     ros::Subscriber marker_sub4 = n.subscribe("/aruco_single1/pose2", 1, &HG_AI_Robot::Get_UR_Pose2, &Robot_Interface);
-        
+    //  机械臂放置物料完成标志位
+    ros::Publisher place_pub = n.advertise<std_msgs::Int32>("PlaceDone", 1000);
+    //  成品抓取
+    ros::Publisher assemble_pub = n.advertise<std_msgs::Int32>("AssembleDone", 1000);
+
     //判断上电状态，未上电则上电Start_Moment_Thread
     if(!power_state)
     {
         Robot_Interface.Robot_Set_Power(1,robot);
     }
-
-    //初始化参数
- 	float sx ,sy ,sz ,ww ,wx ,wy, wz;
-    //  机械臂平移运动
-	float sx1 ,sy1 ,sz1 ,ww1 ,wx1 ,wy1, wz1;
-    //  机械臂平移运动校准
-    float sx2 ,sy2 ,sz2 ,ww2 ,wx2 ,wy2, wz2;
-     //  机械臂平移运动放置
-    float sx3 ,sy3 ,sz3 ,ww3 ,wx3 ,wy3, wz3;
-
-    //放置顺序对应的AR码ID
-    int BJJ_ID = 4;
-
-    //钣金件放置抓取参数
-    double bjj_place_x,bjj_place_y,bjj_place_z;
-    double bjj_grasp_x,bjj_grasp_y,bjj_grasp_z;
-
-    double robot_angle = 0.0;   // 校准角度
-
-    //放置完成信号
-    std_msgs::Int32 tag;
-
-    //定义PI和固定位姿
-    const double PI = 3.14159;
-    std::array<double, 7> q_init;
 
     // // 机械臂抓取识别位姿
     // std::array<double, 7> grasp_identify_pose = {{(-95.365406 * PI / 180), (-14.531547* PI / 180), (5.96469726 * PI / 180), (-69.987455 * PI / 180), (-2.7401447 * PI / 180), (-94.285182 * PI / 180), (-4.0333042 * PI / 180)}};
@@ -146,26 +155,9 @@ int main(int argc, char *argv[])
     // // 机械臂放置到物料盘与装配台中转位置
     // std::array<double, 7> place_fixed_middle_pose = {{(-30.278141 * PI / 180), (-14.834426* PI / 180), (6.0488525 * PI / 180), (-74.248970 * PI / 180), (-2.8477249 * PI / 180), (-90.563409 * PI / 180), (-2.7336559 * PI / 180)}};
 
-    // 从物料盘上面抓取钣金件参数
-    node.param("bjj_grasp_x", bjj_grasp_x, 0.015);  //  从物料盘抓取id1物料时机械臂的x坐标偏移量(笛卡尔坐标系)，增大往左
-    node.param("bjj_grasp_y", bjj_grasp_y, 0.004);  //　从物料盘抓取id1物料时机械臂的y坐标偏移量(笛卡尔坐标系)，增大向前
-    node.param("bjj_grasp_z", bjj_grasp_z, 0.040134663);  //　从物料盘抓取id1物料时机械臂的z坐标偏移量(笛卡尔坐标系)，往下减小
-
-    // 设置放置钣金件参数
-    node.param("bjj_place_x", bjj_place_x, 0.007);  // 放置物料到装配台时机械臂的x坐标偏移量(笛卡尔坐标系)，增大往左(默认：0.007)
-    node.param("bjj_place_y", bjj_place_y, 0.053);  //　放置物料到装配台时机械臂的y坐标偏移量(笛卡尔坐标系)，增大向前(默认：0.053)
-    node.param("bjj_place_z", bjj_place_z, 0.253);    //　放置物料到装配台时机械臂的z坐标偏移量(笛卡尔坐标系)，往下增大(默认：0.253)
-
-    //  机械臂放置物料完成标志位
-    ros::Publisher place_pub = n.advertise<std_msgs::Int32>("PlaceDone", 1000);
-    //  成品抓取
-    ros::Publisher assemble_pub = n.advertise<std_msgs::Int32>("AssembleDone", 1000);
-
     //速度限制
     move_sped = min(move_sped, 0.3);
-
     ros::Rate loop_rate(10);
-
 	ros::Subscriber agv_flag = n.subscribe("agv_state", 1, AGV_CallBack);
     Robot_Interface.Stop_Moment_Thread = true;
 
@@ -177,7 +169,6 @@ int main(int argc, char *argv[])
         Robot_Interface.Robot_MoveJ(Robot_Interface.place_fixed_middle_pose,robot);
         //  抓取识别位姿
         Robot_Interface.Robot_MoveJ(Robot_Interface.place_identify_pose,robot);
-
 /*-----------------------------id3, 钣金件-----------------------------*/
         while(AGV_Current_Goal != 3)
         {
@@ -198,20 +189,23 @@ int main(int argc, char *argv[])
                 move_forward = true;
                 no_data_time = 0;
             }
+
             else if(no_data_time > 5 && !move_backward)
             {
                 Robot_Interface.Robot_MoveJ(Robot_Interface.place_identify_pose,robot);
-                Robot_Interface.Robot_MoveL(0.0,-Robot_Interface.Move_Deviation1,0.0,robot);
+                Robot_Interface.Robot_MoveL(0.0, -Robot_Interface.Move_Deviation1, 0.0,robot);
                 move_backward = true;
                 no_data_time = 0;
             }
+
             else if(no_data_time>5 && !move_left)
             {
                 Robot_Interface.Robot_MoveJ(Robot_Interface.place_identify_pose,robot);
-                Robot_Interface.Robot_MoveL(Robot_Interface.Move_Deviation,0.0,0.0,robot);
+                Robot_Interface.Robot_MoveL(Robot_Interface.Move_Deviation, 0.0, 0.0, robot);
                 move_left = true;
                 no_data_time = 0;
             }
+
             else if(no_data_time > 5 && !move_right)
             {
                 Robot_Interface.Robot_MoveJ(Robot_Interface.place_identify_pose,robot);
@@ -223,8 +217,8 @@ int main(int argc, char *argv[])
             ros::spinOnce();
             loop_rate.sleep();
         }
-
-       if (move_forward && !move_backward)
+        
+        if (move_forward && !move_backward)
         {
             std::cout<<"move forward"<<std::endl;
             move_forward = move_backward = false;
@@ -234,8 +228,8 @@ int main(int argc, char *argv[])
             std::cout<<"move backword"<<std::endl;
             move_forward = move_backward = false;
         }
-
-       if (move_left && !move_right)
+        
+        if (move_left && !move_right)
         {
             std::cout<<"move left"<<std::endl;
             move_left = move_right = false;
@@ -259,15 +253,17 @@ int main(int argc, char *argv[])
         std::cout << "dataz:" <<sz<<std::endl;
 
         //构造四元数
-        Eigen::Quaterniond quaternion(ww,wx,wy,wz);
+        Eigen::Quaterniond quaternion(ww, wx, wy, wz);
         //四元数转欧拉角
-        Eigen::Vector3d eulerAngle=quaternion.matrix().eulerAngles(2,1,0);
+        Eigen::Vector3d eulerAngle=quaternion.matrix().eulerAngles(2, 1, 0);
         //弧度转角度
         robot_angle = (eulerAngle(0) * 180) / PI;
+
         if(robot_angle > 90.0)
         {
-	            robot_angle = 180.0 - robot_angle;	
+            robot_angle = 180.0 - robot_angle;	
 	    }
+
         if(robot_angle > 90)
         {
             //  机械臂末端旋转
@@ -279,13 +275,13 @@ int main(int argc, char *argv[])
             Robot_Interface.Robot_MoveR(eulerAngle(0) - PI/2, robot);
         }
 
-        std::cout<<"AR码角度： "<< robot_angle <<std::endl;
+        std::cout << "AR码角度： " << robot_angle << std::endl;
         sleep(1.0);
 	    Robot_Interface.clean_ur_data();
 
         /*-----初步校准-----*/
         //等待二维码数据
-	    while(Robot_Interface.Ur_Pose[0][0]==0.0)
+	    while(Robot_Interface.Ur_Pose[0][0] == 0.0)
         {
             ros::spinOnce();
             loop_rate.sleep();
@@ -304,7 +300,7 @@ int main(int argc, char *argv[])
         std::cout << "datay:" <<sy<<std::endl;
         std::cout << "dataz:" <<sz<<std::endl;
 
-        Robot_Interface.Robot_MoveL(sx-0.05,-sy+0.02,0.0,robot);
+        Robot_Interface.Robot_MoveL(sx-0.05, -sy+0.02, 0.0, robot);
         sleep(1.0);
         Robot_Interface.clean_ur_data();
 
@@ -347,7 +343,7 @@ int main(int argc, char *argv[])
         {
             sx = -(0.0035 - sx);
         }
-        Robot_Interface.Robot_MoveL(sx,-sy,0.0,robot);
+        Robot_Interface.Robot_MoveL(sx, -sy, 0.0, robot);
         std::cout << "精度计算的坐标平移量" <<std::endl;
         std::cout << "datax:" <<sx<<std::endl;
         std::cout << "datay:" <<sy<<std::endl;
@@ -369,34 +365,34 @@ int main(int argc, char *argv[])
         wy = Robot_Interface.Ur_Pose[0][5];
         wz = Robot_Interface.Ur_Pose[0][6];
         //Robot_Interface.clean_ur_data();
-        std::cout << "抓取前ar坐标" <<std::endl;
-        std::cout << "datax:" <<sx<<std::endl;
-        std::cout << "datay:" <<sy<<std::endl;
-        std::cout << "dataz:" <<sz<<std::endl;
+        std::cout << "抓取前ar坐标" << std::endl;
+        std::cout << "datax:" << sx << std::endl;
+        std::cout << "datay:" << sy << std::endl;
+        std::cout << "dataz:" << sz << std::endl;
         
-        Robot_Interface.Robot_MoveL(sx-bjj_grasp_x,-sy+bjj_grasp_y,0.0,robot);
-        Robot_Interface.Robot_MoveL(0.0,0.0,-sz+bjj_grasp_z,robot);
+        Robot_Interface.Robot_MoveL(sx-bjj_grasp_x, -sy+bjj_grasp_y, 0.0, robot);
+        Robot_Interface.Robot_MoveL(0.0, 0.0, -sz+bjj_grasp_z, robot);
         sleep(1.0);
         Robot_Interface.clean_ur_data();
 
-        bool close_state = Robot_Interface.Robot_Grasp_Control(0,robot);
+        bool close_state = Robot_Interface.Robot_Grasp_Control(0, robot);
         if(close_state)
         {
             //往上
-            Robot_Interface.Robot_MoveL(0.0,0.0,bjj_place_z,robot);
-	        Robot_Interface.Robot_MoveJ(Robot_Interface.grasp_identify_pose,robot);
+            Robot_Interface.Robot_MoveL(0.0, 0.0, bjj_place_z, robot);
+	        Robot_Interface.Robot_MoveJ(Robot_Interface.grasp_identify_pose, robot);
             //中间位姿
-            Robot_Interface.Robot_MoveJ(Robot_Interface.grasp_fixed_middle_pose,robot);
+            Robot_Interface.Robot_MoveJ(Robot_Interface.grasp_fixed_middle_pose, robot);
             //初始位姿
-            Robot_Interface.Robot_MoveJ(Robot_Interface.pubsh_pose,robot);
+            Robot_Interface.Robot_MoveJ(Robot_Interface.pubsh_pose, robot);
             //放置２号位姿
-            Robot_Interface.Robot_MoveL(bjj_place_x,bjj_place_y,0.0,robot);
+            Robot_Interface.Robot_MoveL(bjj_place_x, bjj_place_y, 0.0, robot);
             //往下
-            Robot_Interface.Robot_MoveL(0.0,0.0,-bjj_place_z,robot);
+            Robot_Interface.Robot_MoveL(0.0, 0.0,-bjj_place_z, robot);
         }
-	    bool open_state = Robot_Interface.Robot_Grasp_Control(1,robot);
+	    bool open_state = Robot_Interface.Robot_Grasp_Control(1, robot);
 	    //往上
-        Robot_Interface.Robot_MoveL(0.0,0.0,bjj_place_z,robot);
+        Robot_Interface.Robot_MoveL(0.0, 0.0, bjj_place_z, robot);
         if(open_state)
         {
             //初始位姿
